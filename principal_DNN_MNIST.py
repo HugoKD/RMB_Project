@@ -9,12 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from principal_RBM_aplha import *
 from principal_DBN_alpha import *
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 
-file_path = os.path.join("datasets", "binaryalphadigs.mat")
-data = scipy.io.loadmat(file_path)
-images = data['dat']
-labels = data['classlabels']
 
 #raw_dataset = MNIST(root="datasets/", train=True, download=True)
 #Dataset organisé comme 36 classes chacune contenant ~30 images A-Z + 0-9
@@ -26,16 +22,6 @@ def show_image(class_idx, sample_idx):
 
 
 def lire_alpha_digit(data, indices_classes):
-    """
-    Charge les caractères sélectionnés depuis le dataset Binary AlphaDigits et les transforme en matrice.
-
-    Paramètres :
-    - file_path (str) : Chemin du fichier .mat contenant le dataset.
-    - indices_classes (list) : Liste des indices des caractères à récupérer (0-35).
-
-    Retourne :
-    - X (numpy array) : Matrice des données (N, D), où N = nombre d'images et D = 320 (20x16 pixels aplatis).
-    """
 
     X = []
     images = data['dat']
@@ -52,9 +38,6 @@ def lire_alpha_digit(data, indices_classes):
 
 
 def init_DNN(sizes,nbr_classes):
-    """
-    un DNN est un DBN avec une couche de classification supplémentaire
-    """
 
     DBN = init_DBN(sizes)
     n_hidden_minus_1 = DBN[-1]["W"].shape[1]
@@ -71,18 +54,13 @@ def init_DNN(sizes,nbr_classes):
     return DNN
 
 
-def pretrain_DNN(X, sizes, epochs=100, learning_rate=0.01, batch_size=32, image_size=(28,28)):
+def pretrain_DNN(X, DNN,sizes, epochs=100, learning_rate=0.01, batch_size=32, image_size=(28,28)):
     DBN_trained = train_DBN(X, sizes, epochs=epochs, learning_rate=learning_rate, batch_size=batch_size, image_size=image_size)
     DNN["DBN"] = DBN_trained["DBN"]
     return DNN
 
 def calcul_softmax(X):
-    '''
-    X est supposé être un vecteur colonnes représentant l'output d'un RBM ou de la couche de classification.
-    Donc de shape (nbr_units,)
-    :param X:
-    :return: Softmax(X)
-    '''
+
     return np.exp(X) / np.sum(np.exp(X), axis=1, keepdims=True)
 
 
@@ -100,47 +78,18 @@ def entree_sortie_reseau(X,DNN):
 
 
 def calcul_entropie_croisee(probas, labels):
-    """
-    Calcule l'entropie croisée entre les probabilités prédites et les labels.
 
-    Paramètres :
-    - probas (numpy array) : Probabilités prédites de taille (N, C), où N est le nombre d'exemples et C le nombre de classes.
-    - labels (numpy array) : Labels one-hot encodés de taille (N, C).
-
-    Retourne :
-    - entropie (float) : Valeur de l'entropie croisée.
-    """
     N = probas.shape[0]  # Nombre d'exemples
     return -np.sum(labels * np.log(probas + 1e-10)) / N  # Ajout de 1e-10 pour éviter log(0)
 
 
 def to_one_hot(labels, n_classes):
-    """
-    Convertit les labels entiers en one-hot encoding.
-
-    Paramètres :
-    - labels (numpy array) : Labels entiers de taille (N,).
-    - n_classes (int) : Nombre total de classes.
-
-    Retourne :
-    - one_hot (numpy array) : Labels one-hot encodés de taille (N, n_classes).
-    """
     return np.eye(n_classes)[labels]
 
 def retropropagation(DNN, dataset, epochs, learning_rate, batch_size,image_size):
     """
     Entraîne un DNN en utilisant la rétropropagation pour minimiser l'entropie croisée.
-
-    Paramètres :
-    - DNN (dict) : Dictionnaire contenant les poids et biais du DNN.
-    - X (numpy array) : Données d'entrée de taille (N, D), où N est le nombre d'exemples et D la dimension des visibles.
-    - Y (numpy array) : Labels one-hot encodés de taille (N, C), où C est le nombre de classes.
-    - epochs (int) : Nombre d'itérations de la descente de gradient.
-    - learning_rate (float) : Taux d'apprentissage.
-    - batch_size (int) : Taille du mini-batch.
-
-    Retourne :
-    - DNN (dict) : Dictionnaire contenant les poids et biais du DNN après entraînement.
+    Les formules de gradient classiques sont utilisées pour update les poids et les biais.
     """
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
@@ -197,7 +146,7 @@ def retropropagation(DNN, dataset, epochs, learning_rate, batch_size,image_size)
     return DNN
 
 
-def test_DNN(dataset,DNN, image_size, batch_size =32):
+def DNN_test(dataset,DNN, image_size, batch_size =32):
     """
     Calcule le taux d'erreur
     :param dataset:
@@ -216,19 +165,10 @@ def test_DNN(dataset,DNN, image_size, batch_size =32):
     labels = np.argmax(probas_sortie, axis=1)
     return np.mean(labels != Y)
 
-#définition d'une transforamtion pytorch
-class BinarizeImage:
-    def __init__(self, threshold=128):
-        self.threshold = threshold
+##################################################################################################
+################################### Parties 4 & 5 ################################################
+##################################################################################################
 
-    def __call__(self, x):
-        # Binarisation de l'image : pixels supérieurs au seuil deviennent 1, les autres deviennent 0
-        return torch.where(x > self.threshold / 255.0, torch.tensor(1.0), torch.tensor(0.0))
-
-
-
-
- # Nombre de classes pour la couche de classification
 parametres = {
     'n_epochs_GD_DNN' : 100,
     'n_epochs_RBM' : 100,
@@ -238,23 +178,48 @@ parametres = {
     'batch_size_RBM' : 32,
     'n_données' : 100,
     'n_classes_MNIST' : 10,
-    'image_size_MNIST' : (28,28),
-    'image_size' : (16,20),
+    'image_size' : (20,16), #on convertit les images MNIST en 20*16 au lieu de 28*28
 }
 
-parametres['taille_reseau'] =  [parametres["image_size_MNIST"][0]*parametres["image_size_MNIST"][1], 800, 500, 200,100]
+parametres['taille_reseau'] =  [parametres["image_size"][0]*parametres["image_size"][1], 800, 500, 200,100]
 
-transform = transforms.Compose([
+
+#définition d'une transforamtion pytorch
+class BinarizeImage:
+    def __init__(self, threshold=128):
+        self.threshold = threshold
+
+    def __call__(self, x):
+        # Binarisation de l'image : pixels supérieurs au seuil deviennent 1, les autres deviennent 0
+        return torch.where(x > self.threshold / 255.0, torch.tensor(1.0), torch.tensor(0.0))
+
+#Préprocessing
+transform = transforms.Compose([ #Pour MNIST (utilisation de pytorch
     transforms.ToTensor(),
     BinarizeImage(threshold=128), #binariser blanc/noir
     transforms.Resize((parametres["image_size"][0], parametres["image_size"][1])),
 ])
 
 
+#définition de notre dataset pytorch avec binaryAlphaDigits
+file_path = os.path.join("datasets", "binaryalphadigs.mat")
+data = scipy.io.loadmat(file_path)
 
+dataset = binaryalphadigs_dataset(data = data, indices_classes = [35])
+sizes = [320,784, 500, 200]  # Tailles des couches du DBN
+DBN_trained = train_DBN(dataset, sizes, epochs=1000, learning_rate=0.01, batch_size=32)
+generated_images = generer_image_DBN(DBN_trained, n_iterations=500, n_images=10, image_shape=(20, 16), plot=True)
+
+'''
 DNN = init_DNN(parametres["taille_reseau"], parametres["n_classes_MNIST"])  # Initialisation du DNN
 train_dataset = MNIST(root="datasets/raw", train=True, download=False, transform=transform)
-DNN_trained = retropropagation(DNN = DNN, dataset= train_dataset, epochs=20, learning_rate=0.001, batch_size=200, image_size = parametres["image_size"])
+pre_trained_DNN = pretrain_DNN(DNN = DNN, dataset= train_dataset, epochs=20, learning_rate=0.001, batch_size=200, image_size = parametres["image_size"])
+
+def pretrain_DNN(X, DNN,sizes, epochs=100, learning_rate=0.01, batch_size=32, image_size=(28,28)):
+'''
+
+'''
 
 test_dataset = MNIST(root="datasets/raw", train=False, download=False, transform=transform)
 #rate_error = test_DNN(DNN=DNN, dataset = test_dataset)
+'''
