@@ -1,4 +1,3 @@
-import scipy.io
 from torch.utils.data import Dataset, DataLoader
 from torchvision.datasets import MNIST
 import numpy as np
@@ -7,7 +6,8 @@ import os
 from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt
 import numpy as np
-
+import scipy.io
+import torch
 
 
 
@@ -86,7 +86,7 @@ def sortie_entree_RBM(RBM, H):
     return X_reconstruit
 
 
-def train_RBM(dataset, n_hidden, epochs=100, learning_rate=0.01, batch_size=32):
+def train_RBM(dataset, n_hidden, epochs, learning_rate, batch_size):
     """
     Entraîne un RBM en utilisant l'algorithme de Contrastive Divergence-1 (CD-1).
     But : Apprendre une représentation efficace des images
@@ -94,17 +94,16 @@ def train_RBM(dataset, n_hidden, epochs=100, learning_rate=0.01, batch_size=32):
     """
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     n_visible = next(iter(train_loader))[0].shape[1]  # nbr_image_class, nbr neurones visibles = dim image
-
     RBM = init_RBM(n_visible, n_hidden)  # Initialisation du RBM
 
     for epoch in range(epochs):
 
         # Parcourir les mini-batches
         for X_batch, Y_batch in train_loader:
-            X_batch = X_batch.numpy()
-
+            X_batch, Y_batch = X_batch.numpy(), Y_batch.numpy()
             # étape positive : calcul des probabilités des neurones cachés
             H_pos = entree_sortie_RBM(RBM, X_batch)
+
             # olutput proba des hidden units (0,1), pour chaque images (donc de shape (batch_size,n_hidden))
             #pour travailler avec des bianires plutot que des proba
             H_sample = (np.random.rand(*H_pos.shape) < H_pos).astype(np.float32)
@@ -126,8 +125,8 @@ def train_RBM(dataset, n_hidden, epochs=100, learning_rate=0.01, batch_size=32):
         X_reconstruit = sortie_entree_RBM(RBM, entree_sortie_RBM(RBM, dataset.get_all()[0])) #on passe tout notre dataset X en entrée
         mse = np.mean((dataset.get_all()[0] - X_reconstruit) ** 2)
 
-        if epoch % 100 == 0:
-            print(f"Epoch {epoch + 1}/{epochs}, MSE: {mse:.4f}")
+        if epoch % 10 == 0:
+            print(f"Epoch {epoch + 1}/{epochs}, MSE: {mse:.8f}")
 
     return RBM
 
@@ -190,15 +189,42 @@ class binaryalphadigs_dataset(Dataset):
         self.X = X_new
 
 
-parametres = {
-    "n_hidden" : 10,
-    'epochs' : 20,
-}
+class CustomMNISTDataset(Dataset):
+    def __init__(self, limit, root="datasets", train=True, download=False, transform=None):
+        # Charger le dataset MNIST
+        self.mnist_dataset = MNIST(root=root, train=train, download=download, transform=transform)
 
-'''
-file_path = os.path.join("datasets", "binaryalphadigs.mat")
-data = scipy.io.loadmat(file_path)
-dataset = binaryalphadigs_dataset(data = data, indices_classes = [10,35])
-trained_rbm = train_RBM(dataset=dataset,n_hidden= parametres["n_hidden"],epochs = parametres["epochs"])
-generer_image_RBM(trained_rbm)
-'''
+        # Initialiser les listes pour stocker les données et les labels
+        self.X = []
+        self.Y = []
+
+        # Remplir les listes avec les données de MNIST
+        for img, label in self.mnist_dataset:
+            self.X.append(img.numpy().flatten())  # Transformer l'image en vecteur (1D)
+            self.Y.append(label)
+            if len(self.X) >= limit : break
+
+        # Convertir les listes en tableaux numpy
+        self.X = np.array(self.X)
+        self.Y = np.array(self.Y)
+
+    def __len__(self):
+        return len(self.X)  # Retourne la taille du dataset
+
+    def __getitem__(self, idx):
+        x_sample = self.X[idx]
+        y_sample = self.Y[idx]
+        return x_sample, y_sample
+
+    def shape(self):
+        return self.X.shape  # Retourne la forme des données
+
+    def get_all(self):
+        """Pour obtenir tout le dataset"""
+        return self.X, self.Y
+
+    def update(self, X_new):
+        """Mettre à jour les données"""
+        self.X = X_new
+
+

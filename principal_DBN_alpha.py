@@ -8,6 +8,8 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from principal_RBM_aplha import *
+from torchvision.transforms import ToTensor, transforms
+import torch
 
 file_path = os.path.join("datasets", "binaryalphadigs.mat")
 data = scipy.io.loadmat(file_path)
@@ -41,12 +43,12 @@ def init_DBN(sizes):
 
 
 
-def train_DBN(dataset, sizes, epochs=100, learning_rate=0.01, batch_size=32, image_size = (16,20)):
+def train_DBN(dataset, sizes, epochs, learning_rate, batch_size, image_size):
     """
     Entraîne un DBN de manière non supervisée en utilisant la procédure Greedy Layer-Wise Training.
     """
     assert image_size[0] * image_size[1] == sizes[0], "La première couche doit correspondre à la taille flatten de l'image"
-    DBN = init_DBN(sizes)  # Initialisation du DBN
+    DBN = init_DBN(sizes)
 
     # Données d'entrée pour la première couche
     input_data = dataset
@@ -62,14 +64,13 @@ def train_DBN(dataset, sizes, epochs=100, learning_rate=0.01, batch_size=32, ima
             learning_rate=learning_rate,
             batch_size=batch_size
         )
-
+        print("okkk")
 
         # Propagation des données à travers le RBM entraîné
         if i < len(DBN) - 1:  # Ne pas propager pour la dernière couche
 
             X_output = entree_sortie_RBM(RBM = DBN[i], X = input_data.get_all()[0])
             dataset.update(X_output)
-
 
 
     print("Pré-entraînement du DBN terminé !!")
@@ -106,12 +107,36 @@ def generer_image_DBN(DBN, n_iterations=100, n_images=10, image_shape=(20, 16), 
 
     return generated_images
 
+
 """
+parametres = {
+    'taille_reseau' : [320,784, 500, 200],
+    "learning_rate" : 0.001,
+    'epochs' : 500,
+    'learning_rate_RBM' : 0.001,
+    'batch_size' : 82,
+    'n_données' : 3000,
+    'n_classes_MNIST' : 10,
+    'image_size' : (20,16), #on convertit les images MNIST en 20*16 au lieu de 28*28
+}
+
+parametres['taille_reseau'] =  [parametres["image_size"][0]*parametres["image_size"][1], 800, 500, 200,100]
+
 file_path = os.path.join("datasets", "binaryalphadigs.mat")
 data = scipy.io.loadmat(file_path)
+dataset = binaryalphadigs_dataset(data = data, indices_classes = [35])
 
-dataset = binaryalphadigs_dataset(data = data, indices_classes = [10,35])
-sizes = [320,784, 500, 200]  # Tailles des couches du DBN
-DBN_trained = train_DBN(dataset, sizes, epochs=1000, learning_rate=0.01, batch_size=32)
+#################
+####    OU   ####
+#################
+
+
+
+data_loader = DataLoader(dataset, batch_size=parametres["batch_size"], shuffle=True)
+DBN_trained = train_DBN(dataset, parametres['taille_reseau'], epochs=parametres["epochs"], learning_rate=parametres["learning_rate"],
+                        batch_size=parametres["batch_size"], image_size=(parametres["image_size"][0], parametres["image_size"][1]))
+
 generated_images = generer_image_DBN(DBN_trained, n_iterations=500, n_images=10, image_shape=(20, 16), plot=True)
 """
+
+

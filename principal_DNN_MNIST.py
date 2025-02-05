@@ -146,7 +146,7 @@ def retropropagation(DNN, dataset, epochs, learning_rate, batch_size,image_size)
     return DNN
 
 
-def DNN_test(dataset,DNN, image_size, batch_size =32):
+def DNN_test(dataset,DNN, image_size, batch_size):
     """
     Calcule le taux d'erreur
     :param dataset:
@@ -157,32 +157,12 @@ def DNN_test(dataset,DNN, image_size, batch_size =32):
     test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     X, Y = next(iter(test_loader))
     X = X.numpy().reshape(batch_size, image_size[0]*image_size[1])
-    Y_one_hot = to_one_hot(Y.numpy(), n_classes=10)
 
     data, probas_sortie  = entree_sortie_reseau(X, DNN)
 
     #calcule du taux d'erreur
     labels = np.argmax(probas_sortie, axis=1)
     return np.mean(labels != Y)
-
-##################################################################################################
-################################### Parties 4 & 5 ################################################
-##################################################################################################
-
-parametres = {
-    'n_epochs_GD_DNN' : 100,
-    'n_epochs_RBM' : 100,
-    'learning_rate_GD_DNN' : 0.001,
-    'learning_rate_RBM' : 0.001,
-    'batch_size_GD_DNN' : 32,
-    'batch_size_RBM' : 32,
-    'n_données' : 100,
-    'n_classes_MNIST' : 10,
-    'image_size' : (20,16), #on convertit les images MNIST en 20*16 au lieu de 28*28
-}
-
-parametres['taille_reseau'] =  [parametres["image_size"][0]*parametres["image_size"][1], 800, 500, 200,100]
-
 
 #définition d'une transforamtion pytorch
 class BinarizeImage:
@@ -195,31 +175,100 @@ class BinarizeImage:
 
 #Préprocessing
 transform = transforms.Compose([ #Pour MNIST (utilisation de pytorch
-    transforms.ToTensor(),
     BinarizeImage(threshold=128), #binariser blanc/noir
     transforms.Resize((parametres["image_size"][0], parametres["image_size"][1])),
 ])
 
 
-#définition de notre dataset pytorch avec binaryAlphaDigits
+##################################################################################################
+################################### Parties 4 & 5 ################################################
+##################################################################################################
+
+
+################################# Juste pour le RBM ##############################################
+"""
+parametres = {
+    "n_hidden" : 200,
+    'epochs' : 1000,
+}
+
 file_path = os.path.join("datasets", "binaryalphadigs.mat")
 data = scipy.io.loadmat(file_path)
+dataset = binaryalphadigs_dataset(data = data, indices_classes = [2,5,10,25,35])
+trained_rbm = train_RBM(dataset=dataset,n_hidden= parametres["n_hidden"],epochs = parametres["epochs"])
+generer_image_RBM(trained_rbm)
+"""
+################################# Juste pour le DBN ##############################################
 
+"""
+parametres = {
+    'taille_reseau' : [320,784, 500, 200],
+    "learning_rate" : 0.001,
+    'epochs' : 500,
+    'learning_rate_RBM' : 0.001,
+    'batch_size' : 82,
+    'n_données' : 3000,
+    'n_classes_MNIST' : 10,
+    'image_size' : (20,16), #on convertit les images MNIST en 20*16 au lieu de 28*28
+}
+
+parametres['taille_reseau'] =  [parametres["image_size"][0]*parametres["image_size"][1], 800, 500, 200,100]
+
+'''
+file_path = os.path.join("datasets", "binaryalphadigs.mat")
+data = scipy.io.loadmat(file_path)
 dataset = binaryalphadigs_dataset(data = data, indices_classes = [35])
-sizes = [320,784, 500, 200]  # Tailles des couches du DBN
-DBN_trained = train_DBN(dataset, sizes, epochs=1000, learning_rate=0.01, batch_size=32)
+
+#################
+####    OU   #### 
+#################
+
+dataset = CustomMNISTDataset(root="datasets", train=True, download=True, transform=transform, limit = parametres["n_données"])
+
+'''
+
+data_loader = DataLoader(dataset, batch_size=parametres["batch_size"], shuffle=True)
+DBN_trained = train_DBN(dataset, parametres['taille_reseau'], epochs=parametres["epochs"], learning_rate=parametres["learning_rate"],
+                        batch_size=parametres["batch_size"], image_size=(parametres["image_size"][0], parametres["image_size"][1]))
+
 generated_images = generer_image_DBN(DBN_trained, n_iterations=500, n_images=10, image_shape=(20, 16), plot=True)
+"""
 
-'''
+################################# Juste pour le DNN ##############################################
+
+parametres = {
+    "taille_reseau" : [320,784, 500, 200],
+    'n_epochs_GD_DNN' : 100,
+    'n_epochs_RBM' : 100,
+    'learning_rate_GD_DNN' : 0.001,
+    'learning_rate_RBM' : 0.001,
+    'batch_size_GD_DNN' : 32,
+    'batch_size_RBM' : 32,
+    'n_données' : 1000,
+    'n_classes_MNIST' : 10,
+    'image_size' : (20,16), #on convertit les images MNIST en 20*16 au lieu de 28*28
+}
+
+parametres['taille_reseau'] =  [parametres["image_size"][0]*parametres["image_size"][1], 800, 500, 200,100]
+
+
+train_dataset = CustomMNISTDataset(root="datasets", train=True, download=False, transform=transform, limit = parametres["n_données"])
+
 DNN = init_DNN(parametres["taille_reseau"], parametres["n_classes_MNIST"])  # Initialisation du DNN
-train_dataset = MNIST(root="datasets/raw", train=True, download=False, transform=transform)
-pre_trained_DNN = pretrain_DNN(DNN = DNN, dataset= train_dataset, epochs=20, learning_rate=0.001, batch_size=200, image_size = parametres["image_size"])
+pre_trained_DNN = pretrain_DNN(DNN = DNN, dataset= train_dataset, epochs=parametres["n_epochs_RBM"],
+                                    learning_rate=parametres["learning_rate_RBM"], batch_size=parametres["batch_size_RBM"],
+                                    image_size = parametres["image_size"])
 
-def pretrain_DNN(X, DNN,sizes, epochs=100, learning_rate=0.01, batch_size=32, image_size=(28,28)):
-'''
+fine_tunted_DNN = retropropagation(pre_trained_DNN,train_dataset,parametres["n_epochs_GD_DNN"],parametres["learning_rate_GD_DNN"],
+                                   parametres["batch_size_GD_DNN"],parametres["image_size"])
 
-'''
+randomly_initailized_DNN = retropropagation(DNN,train_dataset,parametres["n_epochs_GD_DNN"],parametres["learning_rate_GD_DNN"],
+                                   parametres["batch_size_GD_DNN"],parametres["image_size"])
 
-test_dataset = MNIST(root="datasets/raw", train=False, download=False, transform=transform)
-#rate_error = test_DNN(DNN=DNN, dataset = test_dataset)
-'''
+
+test_dataset = CustomMNISTDataset(root="datasets", train=False, download=False, transform=transform, limit = parametres["n_données"])
+rate_error_rd_DNN = test_DNN(DNN=randomly_initailized_DNN, dataset = test_dataset)
+rate_error_pt_DNN = test_DNN(DNN=fine_tunted_DNN, dataset = test_dataset)
+
+print(rate_error_rd_DNN)
+print(rate_error_pt_DNN)
