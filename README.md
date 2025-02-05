@@ -31,4 +31,4 @@ Les jeux de données utilisés proviennent de **Kaggle**
 
 ##  Installation et Utilisation
 
-Pour lancer le code on a juste besoin de de-commenter le code mis entre guillemet dans le fichier principal_DNN_MNIST et lancer l’entrainement du type de modèle que l’on souhaite. 
+Pour lancer le code on a juste besoin de de-commenter le code mis entre guillemets dans le fichier principal_DNN_MNIST et lancer l’entrainement du type de modèle que l’on souhaite. 
