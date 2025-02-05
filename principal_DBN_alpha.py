@@ -11,13 +11,10 @@ from principal_RBM_aplha import *
 from torchvision.transforms import ToTensor, transforms
 import torch
 
-file_path = os.path.join("datasets", "binaryalphadigs.mat")
-data = scipy.io.loadmat(file_path)
-images = data['dat']
-labels = data['classlabels']
+
 
 #raw_dataset = MNIST(root="datasets/", train=True, download=True)
-#Dataset organisé comme 36 classes chacune contenant ~30 images A-Z + 0-9
+#Dataset organisé comme 36 classes, chacune contenant ~30 images A-Z + 0-9
 def show_image(class_idx, sample_idx):
     img = np.array(images[class_idx][sample_idx], dtype=np.uint8)
     plt.imshow(img, cmap="gray")
@@ -108,35 +105,6 @@ def generer_image_DBN(DBN, n_iterations=100, n_images=10, image_shape=(20, 16), 
     return generated_images
 
 
-"""
-parametres = {
-    'taille_reseau' : [320,784, 500, 200],
-    "learning_rate" : 0.001,
-    'epochs' : 500,
-    'learning_rate_RBM' : 0.001,
-    'batch_size' : 82,
-    'n_données' : 3000,
-    'n_classes_MNIST' : 10,
-    'image_size' : (20,16), #on convertit les images MNIST en 20*16 au lieu de 28*28
-}
 
-parametres['taille_reseau'] =  [parametres["image_size"][0]*parametres["image_size"][1], 800, 500, 200,100]
-
-file_path = os.path.join("datasets", "binaryalphadigs.mat")
-data = scipy.io.loadmat(file_path)
-dataset = binaryalphadigs_dataset(data = data, indices_classes = [35])
-
-#################
-####    OU   ####
-#################
-
-
-
-data_loader = DataLoader(dataset, batch_size=parametres["batch_size"], shuffle=True)
-DBN_trained = train_DBN(dataset, parametres['taille_reseau'], epochs=parametres["epochs"], learning_rate=parametres["learning_rate"],
-                        batch_size=parametres["batch_size"], image_size=(parametres["image_size"][0], parametres["image_size"][1]))
-
-generated_images = generer_image_DBN(DBN_trained, n_iterations=500, n_images=10, image_shape=(20, 16), plot=True)
-"""
 
 
