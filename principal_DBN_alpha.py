@@ -13,15 +13,6 @@ import torch
 
 
 
-#raw_dataset = MNIST(root="datasets/", train=True, download=True)
-#Dataset organisé comme 36 classes, chacune contenant ~30 images A-Z + 0-9
-def show_image(class_idx, sample_idx):
-    img = np.array(images[class_idx][sample_idx], dtype=np.uint8)
-    plt.imshow(img, cmap="gray")
-    plt.axis("off")
-    plt.show()
-
-
 
 
 def init_DBN(sizes):
@@ -40,7 +31,7 @@ def init_DBN(sizes):
 
 
 
-def train_DBN(dataset, sizes, epochs, learning_rate, batch_size, image_size):
+def train_DBN(dataset, sizes, epochs, learning_rate, batch_size, image_size, plot = False):
     """
     Entraîne un DBN de manière non supervisée en utilisant la procédure Greedy Layer-Wise Training.
     """
@@ -59,22 +50,23 @@ def train_DBN(dataset, sizes, epochs, learning_rate, batch_size, image_size):
             n_hidden=sizes[i + 1],
             epochs=epochs,
             learning_rate=learning_rate,
-            batch_size=batch_size
+            batch_size=batch_size,
+            plot = plot
         )
-        print("okkk")
 
         # Propagation des données à travers le RBM entraîné
         if i < len(DBN) - 1:  # Ne pas propager pour la dernière couche
 
-            X_output = entree_sortie_RBM(RBM = DBN[i], X = input_data.get_all()[0])
-            dataset.update(X_output)
+            X_output = entree_sortie_RBM(RBM=DBN[i], X=input_data.get_all()[0])
+            X_sample = (np.random.rand(*X_output.shape) < X_output).astype(np.float32) #apporter de la stochasticité
+            dataset.update(X_sample)
 
 
     print("Pré-entraînement du DBN terminé !!")
     return DBN
 
 
-def generer_image_DBN(DBN, n_iterations=100, n_images=10, image_shape=(20, 16), plot = True):
+def generer_image_DBN(DBN, n_iterations=200, n_images=10, image_shape=(20, 16), plot = True):
 
     n_visible = DBN[0]["a"].shape[0]  # Dimension de l'image 20*16 = 320
 
@@ -99,12 +91,8 @@ def generer_image_DBN(DBN, n_iterations=100, n_images=10, image_shape=(20, 16), 
             plt.subplot(1, n_images, i + 1)
             plt.imshow(generated_images[i], cmap='gray')
             plt.axis('off')
-        plt.suptitle(f"Images générées par le DBN après {n_iterations} itérations de Gibbs et 500 epochs d'entrainement")
+        plt.suptitle(f"Images générées par le DBN après {n_iterations} itérations de Gibbs")
         plt.show()
 
     return generated_images
-
-
-
-
 

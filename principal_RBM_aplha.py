@@ -86,51 +86,61 @@ def sortie_entree_RBM(RBM, H):
     return X_reconstruit
 
 
-def train_RBM(dataset, n_hidden, epochs, learning_rate, batch_size):
+def train_RBM(dataset, n_hidden, epochs, learning_rate, batch_size, plot=False):
     """
     Entraîne un RBM en utilisant l'algorithme de Contrastive Divergence-1 (CD-1).
-    But : Apprendre une représentation efficace des images
-    Méthode : Réduire la différence entre la phase positive (entrée -> sorties) et la phase negative (entrée-> sorties -> entrées -> sorties).
     """
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-    n_visible = next(iter(train_loader))[0].shape[1]  # nbr_image_class, nbr neurones visibles = dim image
-    RBM = init_RBM(n_visible, n_hidden)  # Initialisation du RBM
+    n_visible = next(iter(train_loader))[0].shape[1]
+    RBM = init_RBM(n_visible, n_hidden)
+    mses = []
 
     for epoch in range(epochs):
+        for X_batch, _ in train_loader:
+            X_batch = X_batch.numpy()
 
-        # Parcourir les mini-batches
-        for X_batch, Y_batch in train_loader:
-            X_batch, Y_batch = X_batch.numpy(), Y_batch.numpy()
-            # étape positive : calcul des probabilités des neurones cachés
+            # Phase positive : Calcul des probabilités et échantillonnage
             H_pos = entree_sortie_RBM(RBM, X_batch)
-
-            # olutput proba des hidden units (0,1), pour chaque images (donc de shape (batch_size,n_hidden))
-            #pour travailler avec des bianires plutot que des proba
             H_sample = (np.random.rand(*H_pos.shape) < H_pos).astype(np.float32)
-            # étape négative : reconstruction des visibles à partir des cachés
+
+            # Phase négative : Reconstruction des visibles
             X_neg = sortie_entree_RBM(RBM, H_sample)
 
-            # calcul des probabilités des neurones cachés pour les données reconstruites
-            H_neg = entree_sortie_RBM(RBM, X_neg)
+            # Échantillonnage stochastique des neurones cachés après reconstruction
+            H_neg_proba = entree_sortie_RBM(RBM, X_neg)
+            H_neg = (np.random.rand(*H_neg_proba.shape) < H_neg_proba).astype(np.float32)
 
-            # mise à jour des poids et des biais
-            grad_W = (np.dot(X_batch.T, H_pos) - np.dot(X_neg.T, H_neg))/batch_size
-            grad_a = (np.sum(X_batch - X_neg, axis=0)) / batch_size
-            grad_b = (np.sum(H_pos - H_neg, axis=0)) / batch_size
+            # Mise à jour des poids et biais
+            grad_W = (np.dot(X_batch.T, H_pos) - np.dot(X_neg.T, H_neg)) / batch_size
+            grad_a = np.mean(X_batch - X_neg, axis=0)
+            grad_b = np.mean(H_pos - H_neg, axis=0)
 
             RBM["W"] += learning_rate * grad_W
             RBM["a"] += learning_rate * grad_a
             RBM["b"] += learning_rate * grad_b
-        # Calcul de la MSE à la fin de chaque époch
-        X_reconstruit = sortie_entree_RBM(RBM, entree_sortie_RBM(RBM, dataset.get_all()[0])) #on passe tout notre dataset X en entrée
-        mse = np.mean((dataset.get_all()[0] - X_reconstruit) ** 2)
+
+        # Calcul de la MSE sur tout le dataset
+        X_full = dataset.get_all()[0]
+        H_full = entree_sortie_RBM(RBM, X_full)
+        X_reconstruit = sortie_entree_RBM(RBM, H_full)
+        mse = np.mean((X_full - X_reconstruit) ** 2)
 
         if epoch % 10 == 0:
             print(f"Epoch {epoch + 1}/{epochs}, MSE: {mse:.8f}")
+        mses.append(mse)
+
+    # Affichage de l'évolution de la MSE
+    if plot:
+        plt.plot(range(1, epochs + 1), mses, marker='o')
+        plt.xlabel("Epoch")
+        plt.ylabel("MSE")
+        plt.title("Évolution de la MSE pendant l'entraînement")
+        plt.grid(True)
+        plt.show()
 
     return RBM
 
-def generer_image_RBM(RBM, n_iterations=100, n_images=10, image_shape=(20, 16), plot = True):
+def generer_image_RBM(RBM, n_iterations=200, n_images=10, image_shape=(20, 16), plot = True):
     n_visible = RBM["a"].shape[0]  # Dimension de l'image 20*16 = 320
 
     generated_images = np.random.rand(n_images, n_visible)
@@ -158,6 +168,9 @@ def generer_image_RBM(RBM, n_iterations=100, n_images=10, image_shape=(20, 16), 
 
 #Définition du custom pytorch dataset pour aussi utiliser pytorch avec les données AlphaDigits
 class binaryalphadigs_dataset(Dataset):
+    '''
+    Les images sont de bases de taille 20,16
+    '''
     def __init__(self, data, indices_classes):
 
         self.X,self.Y = [],[]
@@ -226,5 +239,6 @@ class CustomMNISTDataset(Dataset):
     def update(self, X_new):
         """Mettre à jour les données"""
         self.X = X_new
+
 
 
