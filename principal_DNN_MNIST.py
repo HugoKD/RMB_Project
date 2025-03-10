@@ -66,23 +66,29 @@ def calcul_softmax(X):
         exp_X = np.exp(X - X_max)
         return exp_X / np.sum(exp_X, axis=1, keepdims=True)
 
-def entree_sortie_reseau(X, DNN,):
+import numpy as np
+
+def entree_sortie_reseau(X, DNN):
     # Vérifie que la dimension de l'image correspond à celle du modèle
     assert X.shape[1] == DNN['DBN'][0]['W'].shape[0], \
         "La dimension de l'image doit être identique à celle sur laquelle le modèle a été entraîné"
 
     data = [X]  # Première couche : l'image d'entrée
-    # Propagation à travers les RBMs (les couches cachées)
+    v = X.copy()
+
+    # Propagation stochastique à travers les RBMs (les couches cachées)
     for RBM in DNN['DBN']:
-        sortie = entree_sortie_RBM(RBM, data[-1])
-        data.append(sortie)
+        p_h = entree_sortie_RBM(RBM, v)  # Probabilités d'activation
+        v = np.random.binomial(1, p_h)   # Échantillonnage binaire
+        data.append(p_h)  # On stocke les probabilités pour analyse ou debugging
 
     # Calcul de l'activation de la couche de classification
-    activation_sortie = data[-1] @ DNN["W_classification_layer"] + DNN["b_classification_layer"]
+    activation_sortie = v @ DNN["W_classification_layer"] + DNN["b_classification_layer"]
     probas_sortie = calcul_softmax(activation_sortie)  # Probabilités softmax en sortie
     data.append(probas_sortie)
 
     return data, probas_sortie
+
 
 
 def calcul_entropie_croisee(probas, labels):
@@ -293,15 +299,9 @@ generated_images = generer_image_DBN(DBN_trained, n_iterations=1000, n_images=10
 
 ################################# Juste pour le DNN ##############################################
 '''
-
-
-'''
-
-
-
 parametres = {
-    'n_epochs_GD_DNN' : 1000,
-    'n_epochs_RBM' : 500,
+    'n_epochs_GD_DNN' : 100,
+    'n_epochs_RBM' : 200,
     'learning_rate_GD_DNN' : 0.1,
     'learning_rate_RBM' : 0.1,
     'batch_size_GD_DNN' : 32,
@@ -330,15 +330,16 @@ transform = transforms.Compose([ #Pour MNIST (utilisation de pytorch
     transforms.Resize((parametres["image_size"][0], parametres["image_size"][1])),
 ])
 """
+
+train_dataset = CustomMNISTDataset(root="datasets", train=True, download=False, transform=transform, limit = parametres["n_données"])
+
+"""
+
+
 file_path = os.path.join("datasets", "binaryalphadigs.mat")
 data = scipy.io.loadmat(file_path)
 
 train_dataset = binaryalphadigs_dataset(data = data, indices_classes = parametres["indices_classes_to_trained_on"])
-"""
-
-train_dataset = CustomMNISTDataset(root="datasets", train=True, download=False, transform=transform, limit = parametres["n_données"])
-
-
 
 # Attention, il faut changer le nombre de classes en fonction de si on veut entrainer le modèle sur MNIST ou sur AlphaDigits
 DNN = init_DNN(parametres["taille_reseau"], nbr_classes= parametres["n_classes"])  # Initialisation du DNN
@@ -347,10 +348,11 @@ pre_trained_DNN = pretrain_DNN(DNN = DNN, dataset= train_dataset, epochs=paramet
                                     image_size = parametres["image_size"], sizes = parametres['taille_reseau'], plot = True)
 print("Pre training done ...")
 """
-train_dataset = binaryalphadigs_dataset(data = data, indices_classes = parametres["indices_classes_to_trained_on"]) #re initialiser le dataset
+train_dataset = CustomMNISTDataset(root="datasets", train=True, download=False, transform=transform, limit = parametres["n_données"])
+
 """
 #on rappelle le dataset puisque le pretraining l'a modifié durectement
-train_dataset = CustomMNISTDataset(root="datasets", train=True, download=False, transform=transform, limit = parametres["n_données"])
+train_dataset = binaryalphadigs_dataset(data = data, indices_classes = parametres["indices_classes_to_trained_on"]) #re initialiser le dataset
 
 
 
@@ -364,3 +366,8 @@ true_labels = test_dataset.Y
 rate_error_pt_DNN = DNN_test(DNN=fine_tuned_DNN, dataset = test_dataset, true_labels=true_labels)
 
 print(rate_error_pt_DNN)
+
+
+
+'''
+
