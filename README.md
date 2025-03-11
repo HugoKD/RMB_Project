@@ -1,4 +1,4 @@
-# 📌 Présentation du Projet
+# Présentation du Projet
 
 Ce petit projet explore et manipule des modèles d’apprentissage automatique sur deux jeux de données : **MNIST** et **Binary AlphaDigits**.  
 L'objectif principal est d'évaluer et de comparer les performances de trois architectures de réseaux de neurones spécifiques :
