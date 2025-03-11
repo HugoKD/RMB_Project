@@ -18,16 +18,8 @@ L'objectif principal est d'évaluer et de comparer les performances de trois arc
 
 ##  Méthodologie
 
-Le projet vise à **comparer ces architectures** en termes de :
+Le projet vise à comparer les performances d'un modèle pré-entraîné puis fine-tuné pour la classification à celles d'un modèle entraîné uniquement pour la tâche de classification, sans pré-entraînement.
 
--  **Capacité de représentation** des données.
--  **Performances en classification** sur MNIST et Binary AlphaDigits.
--  **Pouvoir de généralisation** et **robustesse** face aux variations des données (bruit, transformations).
--  **Temps d'apprentissage** et **analyse des performances** (précision, matrice de confusion).
-
-## 📂 Données
-
-Les jeux de données utilisés proviennent de **Kaggle**
 
 ##  Installation et Utilisation
 
