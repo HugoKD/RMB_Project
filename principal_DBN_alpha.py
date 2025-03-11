@@ -1,17 +1,4 @@
-import scipy.io
-from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
-import numpy as np
-import matplotlib.pyplot as plt
-from torchvision.transforms import ToTensor
-import os
-import matplotlib.pyplot as plt
-import numpy as np
 from principal_RBM_aplha import *
-from torchvision.transforms import ToTensor, transforms
-import torch
-
-
 
 
 
